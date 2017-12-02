@@ -1,0 +1,11 @@
+urlList:
+  - http://xk1.ahu.cn
+  - http://xk2.ahu.cn
+  - http://xk3.ahu.cn
+
+username: #学号
+password: #密码
+lessonList: #要选的课的课程列表
+  - uri: /xsxjs.aspx?... #选课页面的uri
+    tech: 王茂水 #老师名字
+    time: 周一第9,10节 #课的时间
