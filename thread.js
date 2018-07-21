@@ -3,6 +3,7 @@ const cheerio = require('cheerio')
 const rp = require('request-promise')
 const Emitter = require('events')
 const fs = require('fs')
+const path = require('path')
 const async = require('async')
 const iconv = require('iconv-lite')
 
@@ -33,10 +34,14 @@ class Thread extends Emitter {
         'Referer': `${url}/default2.aspx`,
       }
     })
+  }
+
+  start() {
     this.work().catch(err => {
       this.emit('error', err)
       this.emit('down', this)
     })
+    return this
   }
 
   async work() {
@@ -66,15 +71,18 @@ class Thread extends Emitter {
         }
       })
     })
+    const captchaName = path.join(__dirname, `${this.name}.png`)
     const code = await new Promise((resolve, reject) => {
-      this.request('/CheckCode.aspx')
-      .pipe(fs.createWriteStream(`${this.name}.png`))
-      .on('close', () => {
-        resolve(this.localVerifyCaptcha())
-      })
+      const res = this.request('/CheckCode.aspx')
+      res.on('error', err => reject(err))
+      res.pipe(fs.createWriteStream(captchaName))
+        .on('close', () => {
+          resolve(this.localVerifyCaptcha())
+        })
     })
+    if (fs.existsSync(captchaName)) fs.unlinkSync(captchaName)
     await new Promise((resolve, reject) => {
-      this.request.post({
+      const res = this.request.post({
         uri: `/default2.aspx`,
         form: {
           'Button1': '',
@@ -91,7 +99,9 @@ class Thread extends Emitter {
         headers: {
           'Referer': `${this.url}/default2.aspx`,
         }
-      }).pipe(iconv.decodeStream('gb2312')).collect((err, body) => {
+      })
+      res.on('error', err => reject(err))
+      res.pipe(iconv.decodeStream('gb2312')).collect((err, body) => {
         if (err) reject(err)
         else {
           const re = body.match(/alert\('([^']+)/i)
@@ -106,20 +116,22 @@ class Thread extends Emitter {
 
   getInfo() {
     return new Promise((resolve, reject) => {
-      this.request({
+      const res = this.request({
         uri: `/xsgrxx.aspx?xh=${this.config.username}&`,
         headers: {
           'Referer': `${this.url}/xs_main.aspx?xh=${this.config.username}`,
         }
-      }).pipe(iconv.decodeStream('gb2312'))
-      .collect((err, body) => {
-        if (err) reject(err)
-        else {
-          const $ = cheerio.load(body)
-          const name = $('table.formlist tr:nth-child(2) td:nth-child(2)').text()
-          resolve(name)
-        }
       })
+      res.on('error', err => reject(err))
+      res.pipe(iconv.decodeStream('gb2312'))
+        .collect((err, body) => {
+          if (err) reject(err)
+          else {
+            const $ = cheerio.load(body)
+            const name = $('table.formlist tr:nth-child(2) td:nth-child(2)').text()
+            resolve(name)
+          }
+        })
     })
   }
 
@@ -142,18 +154,20 @@ class Thread extends Emitter {
   async fetchLesson() {
     this.emit('step', 'preparing')
     const $ = await new Promise((resolve, reject) => {
-      this.request({
+      const res = this.request({
         uri: this.lesson.uri,
         headers: {
           'Referer': encodeURI(`${this.url}/xsxk.aspx?xh=${this.config.username}&xm=${this.name}&gnmkdm=N121101`),
         }
-      }).pipe(iconv.decodeStream('gb2312'))
-      .collect((err, body) => {
-        if (err) reject(err)
-        else {
-          resolve(cheerio.load(body))
-        }
       })
+      res.on('error', err => reject(err))
+      res.pipe(iconv.decodeStream('gb2312'))
+        .collect((err, body) => {
+          if (err) reject(err)
+          else {
+            resolve(cheerio.load(body))
+          }
+        })
     })
 
     const xkkh = $('table.formlist')
@@ -176,7 +190,7 @@ class Thread extends Emitter {
         setTimeout(() => resolve(), 1000)
       })
       const re = await new Promise((resolve, reject) => {
-        this.request.post({
+        const res = this.request.post({
           uri: this.lesson.uri,
           headers: {
             'Referer': `${this.url}${this.lesson.uri}`
@@ -189,19 +203,21 @@ class Thread extends Emitter {
             '__VIEWSTATE': $('input#__VIEWSTATE').attr('value'),
             'xkkh': xkkh,
           }
-        }).pipe(iconv.decodeStream('gb2312'))
-        .collect((err, body) => {
-          if (err) reject(err)
-          else {
-            const re = body.match(/alert\('([^']+)/i)
-            if (re) {
-              if (re[1] === '保存成功！') {
-                this.lesson.status = 'success'
-              }
-              resolve(re[1])
-            }
-          }
         })
+        res.on('error', err => reject(err))
+        res.pipe(iconv.decodeStream('gb2312'))
+          .collect((err, body) => {
+            if (err) reject(err)
+            else {
+              const re = body.match(/alert\('([^']+)/i)
+              if (re) {
+                if (re[1] === '保存成功！') {
+                  this.lesson.status = 'success'
+                }
+                resolve(re[1])
+              }
+            }
+          })
       })
 
       this.emit('msg', re)

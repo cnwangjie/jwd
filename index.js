@@ -13,17 +13,17 @@ try {
 }
 
 const startNewThread = ({url, config}) => {
-  const thread = new Thread({url, config})
+  const thread = new Thread({url, config}).start()
   let threadname
   thread.once('up', () => {
-    threadname = thread.name
-    console.log(chalk.gray(`${threadname} up`))
+    threadname = thread.name + ' ' + thread.url
+    console.log(chalk.white(`${threadname} up`))
   })
   thread.once('down', () => {
     thread.removeAllListeners()
-    console.log(chalk.gray(`${threadname} down`))
+    console.log(chalk.white(`${threadname} down`))
     if (config.lessonList.filter(i => i.status !== 'success').length !== 0) {
-      startNewThread({url, config})
+      setTimeout(() => startNewThread({url, config}), 5000)
     } else {
       console.log(chalk.green(`done!`))
       process.exit(0)
