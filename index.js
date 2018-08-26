@@ -48,3 +48,5 @@ const main = () => {
 }
 
 main()
+
+setTimeout(() => process.exit(1), 20 * 60000)

@@ -9,3 +9,7 @@ lessonList: #要选的课的课程列表
   - uri: /xsxjs.aspx?... #选课页面的uri
     tech: 王茂水 #老师名字
     time: 周一第9,10节 #课的时间
+
+  # - ty: TY64005  #体育课
+  #   tech: 张军
+  #   time: 周五第3,4节
