@@ -2,9 +2,6 @@ const request = require('request')
 const cheerio = require('cheerio')
 const rp = require('request-promise')
 const Emitter = require('events')
-const fs = require('fs')
-const path = require('path')
-const async = require('async')
 const iconv = require('iconv-lite')
 
 const sleep = time => new Promise(r => setTimeout(r, time))
@@ -98,14 +95,17 @@ class Thread extends Emitter {
         resolve(cheerio.load(body))
       })
     })
-    const captchaName = path.join(__dirname, `${this.name}.png`)
     const code = await new Promise((resolve, reject) => {
-      const res = this.request('/CheckCode.aspx')
-      res.on('error', err => reject(err))
-      res.pipe(fs.createWriteStream(captchaName))
-        .on('close', () => resolve(this.localVerifyCaptcha()))
+      this.request('/CheckCode.aspx', {encoding: null}, (err, res, body) => {
+        if (err) reject(err)
+        const bodyEnd = body.indexOf('<!DOCTYPE')
+        if (~bodyEnd) {
+          body = body.slice(0, bodyEnd)
+        }
+        this.imgBuf = body
+        resolve(this.localVerifyCaptcha(body))
+      })
     })
-    if (fs.existsSync(captchaName)) fs.unlinkSync(captchaName)
     return new Promise((resolve, reject) => {
       const res = this.request.post({
         uri: `/default2.aspx`,
@@ -154,12 +154,12 @@ class Thread extends Emitter {
     })
   }
 
-  async localVerifyCaptcha() {
+  async localVerifyCaptcha(imgBuf) {
     const text = await rp.post({
       url: 'https://www.cnwangjie.com/rc/',
       formData: {
         img: {
-          value: fs.createReadStream(`${__dirname}/${this.name}.png`),
+          value: imgBuf,
           options: {
             filename: `${this.name}.png`,
             contentType: 'image/png',
